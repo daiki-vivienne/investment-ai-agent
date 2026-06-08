@@ -160,6 +160,32 @@ def build_safe_investment_memo_section() -> str:
 
 
 # この関数の役割:
+# PER分析メモを、AIの言い忘れがあっても安全な固定文にします。
+def build_safe_per_memo_section(period_check_result: JQuantsPeriodCheckResult | None) -> str:
+    if period_check_result is None or not period_check_result.is_period_matched:
+        return """
+## PER分析メモ
+
+- PERは未取得です。
+- 理由: ユーザー指定期間と一致するJ-Quants正式EPSが未取得のため、PERは計算しません。
+""".strip()
+
+    period_type = period_check_result.requested_period_type
+    non_fy_note = ""
+
+    if period_type.upper() != "FY":
+        non_fy_note = "\n- このEPSは通期実績EPSや予想EPSではありません。"
+
+    return f"""
+## PER分析メモ
+
+- 現在株価ベースの実績PERは取得済みです。
+- 株価データ元はyfinance、EPSデータ元はJ-Quantsです。
+- 株価は現在時点、EPSは指定決算期の実績値です。{non_fy_note}
+""".strip()
+
+
+# この関数の役割:
 # AIスコアを、許可された正式データだけに基づく控えめな表現に補正します。
 def build_safe_ai_score_section(is_period_matched: bool) -> str:
     if not is_period_matched:
@@ -220,6 +246,21 @@ def guard_ai_analysis_markdown(
     memo_section = sections.get("## 投資メモ", "")
     if contains_unsafe_word(memo_section, UNSAFE_PDF_QUANT_WORDS):
         sections["## 投資メモ"] = build_safe_investment_memo_section()
+
+    per_memo_section = sections.get("## PER分析メモ", "")
+    should_replace_per_memo = (
+        per_memo_section.strip() == ""
+        or "数値スコア" in per_memo_section
+        or (
+            period_check_result is not None
+            and period_check_result.is_period_matched
+            and period_check_result.requested_period_type.upper() != "FY"
+            and "通期実績EPSや予想EPSではありません" not in per_memo_section
+        )
+    )
+
+    if should_replace_per_memo:
+        sections["## PER分析メモ"] = build_safe_per_memo_section(period_check_result)
 
     score_section = sections.get("## AIスコア", "")
     if contains_unsafe_word(score_section, UNSAFE_SCORE_WORDS):
