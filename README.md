@@ -2,7 +2,9 @@
 
 決算PDFとAPI由来データを使い、投資判断材料を整理するMarkdownレポートを保存するCLIアプリです。
 
-Ver0.2では「決算書の定性分析」を中心にしつつ、株価、EPS、PER、PBR、時価総額などの投資指標はAPIから取得する設計にしています。自動売買はまだ実装していません。
+Ver3.0では「PDFは定性情報」「J-Quantsは正式財務データ」「yfinanceは参考市場データ」と役割を分けています。
+
+自動売買はまだ実装していません。
 
 ## 設計思想
 
@@ -17,7 +19,8 @@ PDF
 
 API
   ↓
-株価、EPS、PER、PBR、時価総額などの数値取得
+J-Quants: 売上、営業利益、純利益、EPSなどの正式財務データ
+yfinance: 現在株価、PBR、時価総額などの参考市場データ
 
 Markdown
   ↓
@@ -57,10 +60,12 @@ Copy-Item .env.example .env
 ```
 
 `.env` を開き、`OPENAI_API_KEY` に自分のOpenAI APIキーを設定します。
+J-Quantsを使う場合は、`JQUANTS_API_KEY` も設定します。
 
 ```env
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
 OPENAI_MODEL=gpt-4o-mini
+JQUANTS_API_KEY=your_jquants_api_key_here
 ```
 
 APIキーは秘密情報です。GitHubなどに公開しないでください。
@@ -73,13 +78,17 @@ PDFファイルだけでも実行できます。
 python main.py data/pdfs/sample_financial_report.pdf
 ```
 
-証券コードを指定すると、yfinanceでAPI由来データを取得します。
+J-Quantsの期間整合性チェックも行う場合は、証券コード、決算期間、会計年度末を指定します。
 
 ```powershell
-python main.py data/pdfs/kioxia260515_1.pdf --ticker 285A
+python main.py data/pdfs/kioxia260515_1.pdf --stock-code 285A --period-type FY --fiscal-year-end 2026-03-31
 ```
 
-日本株の場合、内部では自動で `.T` を付けます。
+`--stock-code` はJ-Quantsの財務データ検索と、yfinanceの株価取得に使います。
+
+yfinanceで別tickerを指定したい場合だけ、`--ticker` を使います。
+
+日本株をyfinanceで取得する場合、内部では自動で `.T` を付けます。
 
 ```text
 285A → 285A.T
@@ -114,38 +123,51 @@ PDF由来セクションでは、PDFを定性情報の確認に使うことを�
 
 ## API由来データ
 
-試作用として、現在は `yfinance` を使います。
+正式財務データはJ-Quantsから取得します。
+
+J-Quantsでは、ユーザーがCLIで指定した `--period-type` と `--fiscal-year-end` に一致するstatementだけを正式データ候補として扱います。
 
 取得対象の例です。
 
-現在取得できている主な項目：
-- 現在株価
+J-Quantsで正式データとして扱う主な項目：
+- 売上
+- 営業利益
+- 純利益
 - EPS
+
+yfinanceで参考市場データとして取得する主な項目：
+- 現在株価
 - PBR
 - 時価総額
 
 今後API拡張で取得したい項目：
-- 売上
-- 営業利益
-- 純利益
 - ROE
 - 自己資本比率
+- 営業CF
+- フリーCF
+- 予想EPS
+- 予想PER
 
 PERは以下の式で計算します。
 
 ```text
-実績PER = API由来の現在株価 ÷ API由来のEPS
+現在株価ベースの実績PER = yfinance由来の現在株価 ÷ 期間一致したJ-Quants正式EPS
 ```
 
-API由来EPSが未取得の場合、PERは計算せず `未取得` と表示します。
+J-Quants正式EPSが未取得の場合、PERは計算せず `未取得` と表示します。
 
-現時点のyfinanceでは売上、営業利益、純利益が未取得になる場合があります。将来J-Quants APIへ差し替えることで、これらもAPI由来の正式データとして扱う想定です。
+株価は現在時点、EPSは指定決算期の実績値です。
+そのため、レポートでは「現在株価ベースの実績PER」と表示します。
 
 ## yfinanceとJ-Quants API
 
 株価取得処理は [src/market_data_client.py] に分離しています。
 
-現在は試作用としてyfinanceを使っていますが、将来的にはこのファイルをJ-Quants API実装へ差し替える想定です。
+現在は、株価、PBR、時価総額などの参考市場データにyfinanceを使っています。
+
+売上、営業利益、純利益、EPSなどの正式財務データはJ-Quantsを使います。
+
+将来的には、株価、PBR、時価総額などの市場データも、J-Quantsや他の正式データソースで検証できる設計にします。
 
 ## AI要約
 
@@ -168,7 +190,7 @@ AIには売上、営業利益、純利益、EPSをPDFから抜き出して断定
 
 投資判断支援に必要なデータをどこから取得できるか、調査結果を以下にまとめています。
 
-[docs/data_source_research.md](C:/Users/draqu/Desktop/vivienne-qa-lab/investment_ai_agent/docs/data_source_research.md)
+[docs/data_source_research.md](docs/data_source_research.md)
 
 キオクシア `285A.T` を使ったyfinanceの試作用サンプルは以下で実行できます。
 
@@ -178,7 +200,7 @@ python src/yfinance_research_sample.py
 
 J-Quants APIの調査結果は以下にまとめています。
 
-[docs/jquants_research.md](C:/Users/draqu/Desktop/vivienne-qa-lab/investment_ai_agent/docs/jquants_research.md)
+[docs/jquants_research.md](docs/jquants_research.md)
 
 J-Quantsの調査用サンプルは以下で実行できます。
 
@@ -247,7 +269,7 @@ AIがPDFを読むだけで「営業利益が過去最高」「前年比約2倍�
 PDF内の定量的な記述に触れる場合は、以下のように表現します。
 
 ```text
-PDF上の記述では、営業利益が改善したとされています。
+PDF上には業績や財務に関する定量情報が掲載されていますが、正式データとしては扱いません。
 ```
 
 一方で、以下のようには書きません。
@@ -272,7 +294,7 @@ PDF上の記述では、営業利益が改善したとされています。
 
 ## 将来の拡張計画
 
-- yfinanceで試作した市場データ取得をJ-Quants APIへ差し替える
+- 株価、PBR、時価総額などの市場データをJ-Quantsや他の正式データソースで検証できるようにする
 - API由来のEPS、BPS、自己資本、発行済株式数を使ってPER/PBRを安定計算する
 - 市場規模データを取り込み、3年後、5年後、10年後の見通しを比較する
 - 同業他社データを取り込み、自社スコアの相対評価を出す
