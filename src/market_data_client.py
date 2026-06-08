@@ -21,9 +21,9 @@ def normalize_ticker_for_yfinance(ticker: str, is_japanese_stock: bool = True) -
 
 
 # この関数の役割:
-# yfinanceを使って現在株価を取得します。
+# 時価総額を読みやすい表示に変換します。
 # なぜ必要か:
-# Ver0.1では試作用としてyfinanceを使いますが、将来はこのファイルをJ-Quants API実装に差し替えやすくするためです。
+# yfinanceの時価総額は円の大きな数値で返るため、レポート上では億円表示にした方が読みやすいためです。
 def format_market_cap(market_cap: float | None) -> str:
     # この関数の役割:
     # 時価総額を読みやすい表示に変換します。
@@ -36,9 +36,10 @@ def format_market_cap(market_cap: float | None) -> str:
 
 
 # この関数の役割:
-# yfinanceを使って現在株価、EPS、PBR、時価総額を取得します。
+# yfinanceを使って現在株価、PBR、時価総額を取得します。
 # なぜ必要か:
-# PERなどの投資指標はPDF由来ではなくAPI由来データで計算する方針にするためです。
+# 株価などの市場データはPDFから取得できないため、試作用APIから取得するためです。
+# EPSはJ-Quantsの期間一致データを正式データとして扱うため、yfinance EPSはレポートに出しません。
 def fetch_market_data(ticker: str, is_japanese_stock: bool = True) -> MarketDataResult:
     normalized_ticker = normalize_ticker_for_yfinance(
         ticker=ticker,
@@ -120,7 +121,6 @@ def fetch_market_data(ticker: str, is_japanese_stock: bool = True) -> MarketData
         latest_close_price = recent_price_history["Close"].dropna().iloc[-1]
         current_stock_price = float(latest_close_price)
         stock_info = stock_ticker.info
-        eps = stock_info.get("trailingEps")
         pbr = stock_info.get("priceToBook")
         market_cap = stock_info.get("marketCap")
 
@@ -135,14 +135,18 @@ def fetch_market_data(ticker: str, is_japanese_stock: bool = True) -> MarketData
             display_operating_profit=NOT_ACQUIRED,
             net_income=None,
             display_net_income=NOT_ACQUIRED,
-            eps=float(eps) if eps is not None else None,
-            display_eps=f"{float(eps):,.2f}円" if eps is not None else NOT_ACQUIRED,
+            eps=None,
+            display_eps=NOT_ACQUIRED,
             pbr=float(pbr) if pbr is not None else None,
             display_pbr=f"{float(pbr):.2f}倍" if pbr is not None else NOT_ACQUIRED,
             market_cap=float(market_cap) if market_cap is not None else None,
             display_market_cap=format_market_cap(float(market_cap)) if market_cap is not None else NOT_ACQUIRED,
             data_source="yfinance",
-            note="yfinanceから取得したデータです。試作用のため、将来はJ-Quants APIへ差し替える想定です。",
+            note=(
+                "yfinanceから取得した参考市場データです。"
+                "売上、利益、EPSなどの正式財務データは、期間一致したJ-Quantsデータを優先します。"
+                "将来は株価、PBR、時価総額などの市場データも、J-Quantsや他の正式データソースで検証できる設計にします。"
+            ),
         )
 
     except Exception as error:

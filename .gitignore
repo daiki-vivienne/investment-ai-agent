@@ -8,3 +8,10 @@ data/pdfs/*
 
 data/reports/*
 !data/reports/.gitkeep
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

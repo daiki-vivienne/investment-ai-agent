@@ -11,6 +11,7 @@ class ApplicationConfig:
     # アプリで使う設定値をひとまとめにして管理します。
     openai_api_key: str
     openai_model: str
+    jquants_api_key: str | None
 
 
 # この関数の役割:
@@ -29,6 +30,7 @@ def load_application_config() -> ApplicationConfig:
 
     openai_api_key = os.getenv("OPENAI_API_KEY")
     openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    jquants_api_key = os.getenv("JQUANTS_API_KEY")
 
     if openai_api_key is None or openai_api_key.strip() == "":
         raise ValueError(
@@ -38,4 +40,5 @@ def load_application_config() -> ApplicationConfig:
     return ApplicationConfig(
         openai_api_key=openai_api_key,
         openai_model=openai_model,
+        jquants_api_key=jquants_api_key,
     )
