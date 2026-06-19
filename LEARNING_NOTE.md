@@ -8,7 +8,7 @@
 
 PDFは、会社の説明、事業の方向性、リスク、経営陣のコメントなどの定性情報を読むために使います。
 
-株価、EPS、PER、PBR、時価総額などの投資指標は、APIから取得する前提にします。
+株価、EPS、FEPS、NxFEPS、PER、PBR、時価総額などの投資指標は、APIから取得する前提にします。
 
 PDFから抽出した売上・利益・EPSは誤検知することがあるため、正式データとして表示せず、PER計算にも使いません。
 
@@ -25,7 +25,7 @@ numeric_extractor.py でPDF由来の参考情報セクションを作成
   ↓
 market_data_client.py でAPI由来データを取得
   ↓
-valuation_analyzer.py でAPI由来EPSだけを使ってPER分析
+valuation_analyzer.py でJ-Quants EPS / FEPS / NxFEPS とyfinance株価を使ってPER分析
 
 PDFテキスト + API由来データ
   ↓
@@ -70,7 +70,13 @@ API由来データを取得します。
 
 PERや割安度分析を担当します。
 
-実績PERは、API由来の現在株価とAPI由来のEPSが両方取得できた場合だけ計算します。
+Ver4.0では、以下を分けて計算します。
+
+- 直近PER: yfinance現在株価 ÷ J-Quants EPS
+- 会社予想EPSベースの予想PER: yfinance現在株価 ÷ J-Quants FEPS
+- 次期予想PER候補: yfinance現在株価 ÷ J-Quants NxFEPS
+
+EPS、FEPS、NxFEPSは、ユーザー指定期間と一致したJ-Quants statement内の値だけを使います。
 
 PDF由来のEPSは使いません。
 
@@ -80,7 +86,7 @@ AI要約を担当します。
 
 AIはPDFから定性情報を整理します。
 
-売上、営業利益、純利益、EPS、株価、PER、PBR、時価総額などの正式データはAPI由来データだけを使い、推測しません。
+売上、営業利益、純利益、EPS、FEPS、NxFEPS、株価、PER、PBR、時価総額などの正式データはAPI由来データだけを使い、推測しません。
 
 ### src/data_models.py
 
@@ -105,7 +111,7 @@ python main.py data/pdfs/sample.pdf --ticker 285A
 5. `numeric_extractor.py` がPDF由来の参考情報セクションを作る
 6. `market_data_client.py` がAPI由来データを取得する
 7. `ai_analyzer.py` がPDFテキストとAPI由来データを使って要約する
-8. `valuation_analyzer.py` がAPI由来EPSだけを使ってPER分析する
+8. `valuation_analyzer.py` がJ-Quants EPS / FEPS / NxFEPS とyfinance株価を使ってPER分析する
 9. `main.py` がPDF由来、API由来、AI要約、投資判断支援を結合する
 10. `report_writer.py` がMarkdownファイルを保存する
 
@@ -273,13 +279,17 @@ PERは「株価 ÷ EPS」で計算します。
 
 EPSの期間や定義がズレると、PERも間違った数字になります。
 
-そのためVer3.0では、PDF由来のEPSをPER計算に使いません。
+そのため、PDF由来のEPSをPER計算に使いません。
 
-ユーザー指定期間と一致したJ-Quants正式EPSが取得できた場合だけ、yfinanceの株価と組み合わせて試作用PERを計算します。
+ユーザー指定期間と一致したJ-Quants EPS / FEPS / NxFEPS が取得できた場合だけ、yfinanceの株価と組み合わせてPERを計算します。
 
-このPERは「現在株価ベースの実績PER」と呼びます。
+Ver4.0では、直近PER、会社予想EPSベースの予想PER、次期予想PER候補を分けて表示します。
 
-株価は現在時点、EPSは指定決算期の実績値なので、「2025年3月期のPER」のように書くと誤解を招きます。
+株価は現在時点、EPS / FEPS / NxFEPS はJ-Quantsの指定決算期に一致したstatement内の値なので、TTM、会社予想、次期予想を混同しないことが重要です。
+
+EPSが未取得、0、赤字の場合はPERを計算せず、理由を補足欄に表示します。
+
+PERが1000倍を超える場合は、異常値の可能性があるためWARNINGを表示します。
 
 ### J-Quants無料プランの注意点
 
@@ -288,3 +298,21 @@ EPSの期間や定義がズレると、PERも間違った数字になります�
 最新の通期決算が企業PDFでは公開されていても、無料プランのAPIではまだ取得できない場合があります。
 
 この場合、アプリは推測で補完せず「未取得」として扱います。
+
+## Ver4.0で追加した考え方
+
+Ver4.0では、友達の要望である「直近PERと予想PER」を安全に出すため、J-Quantsの `EPS`、`FEPS`、`NxFEPS` を取得候補に追加しました。
+
+それぞれの意味を混同しないように、レポートでは以下のように分けます。
+
+- `EPS`: 実績EPSとして扱い、直近PERの計算に使います。
+- `FEPS`: 会社予想EPS候補として扱い、会社予想EPSベースの予想PERの計算に使います。
+- `NxFEPS`: 次期予想EPS候補として扱い、次期予想PER候補の計算に使います。
+
+ただし、これらはすべてユーザー指定期間と一致したJ-Quants statement内にある場合だけ使います。
+
+期間が一致しない場合は、EPS、FEPS、NxFEPSが取得できていてもPER計算には使いません。
+
+また、EPSが未取得、0、赤字の場合はPERを計算せず、Markdownの補足欄に理由を表示します。
+
+この設計により、PDF由来のEPS、yfinance由来のEPS、期間不一致のJ-Quantsデータを混ぜずに、投資判断材料として安全なPER表を作れます。

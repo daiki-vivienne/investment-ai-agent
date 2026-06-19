@@ -2,7 +2,7 @@
 
 決算PDFとAPI由来データを使い、投資判断材料を整理するMarkdownレポートを保存するCLIアプリです。
 
-Ver3.0では「PDFは定性情報」「J-Quantsは正式財務データ」「yfinanceは参考市場データ」と役割を分けています。
+Ver4.0では「PDFは定性情報」「J-Quantsは正式財務データ」「yfinanceは参考市場データ」と役割を分け、直近PERと会社予想EPSベースの予想PERを表示できるようにしています。
 
 自動売買はまだ実装していません。
 
@@ -19,7 +19,7 @@ PDF
 
 API
   ↓
-J-Quants: 売上、営業利益、純利益、EPSなどの正式財務データ
+J-Quants: 売上、営業利益、純利益、EPS、FEPS、NxFEPSなどの正式財務データ候補
 yfinance: 現在株価、PBR、時価総額などの参考市場データ
 
 Markdown
@@ -134,6 +134,8 @@ J-Quantsで正式データとして扱う主な項目：
 - 営業利益
 - 純利益
 - EPS
+- FEPS
+- NxFEPS
 
 yfinanceで参考市場データとして取得する主な項目：
 - 現在株価
@@ -145,19 +147,19 @@ yfinanceで参考市場データとして取得する主な項目：
 - 自己資本比率
 - 営業CF
 - フリーCF
-- 予想EPS
-- 予想PER
 
 PERは以下の式で計算します。
 
 ```text
-現在株価ベースの実績PER = yfinance由来の現在株価 ÷ 期間一致したJ-Quants正式EPS
+直近PER = yfinance由来の現在株価 ÷ 期間一致したJ-Quants EPS
+会社予想EPSベースの予想PER = yfinance由来の現在株価 ÷ 期間一致したJ-Quants FEPS
+次期予想PER候補 = yfinance由来の現在株価 ÷ 期間一致したJ-Quants NxFEPS
 ```
 
-J-Quants正式EPSが未取得の場合、PERは計算せず `未取得` と表示します。
+J-Quants EPS / FEPS / NxFEPS が未取得、0、赤字の場合、該当するPERは計算せず、理由を補足欄に表示します。
 
-株価は現在時点、EPSは指定決算期の実績値です。
-そのため、レポートでは「現在株価ベースの実績PER」と表示します。
+株価は現在時点、EPS / FEPS / NxFEPS は指定決算期に一致したstatement内の値です。
+TTM、会社予想、次期予想を混同しないよう、データ元と補足をMarkdown上に表示します。
 
 ## yfinanceとJ-Quants API
 
@@ -165,7 +167,7 @@ J-Quants正式EPSが未取得の場合、PERは計算せず `未取得` と表�
 
 現在は、株価、PBR、時価総額などの参考市場データにyfinanceを使っています。
 
-売上、営業利益、純利益、EPSなどの正式財務データはJ-Quantsを使います。
+売上、営業利益、純利益、EPS、FEPS、NxFEPSなどの正式財務データ候補はJ-Quantsを使います。
 
 将来的には、株価、PBR、時価総額などの市場データも、J-Quantsや他の正式データソースで検証できる設計にします。
 
@@ -182,9 +184,25 @@ AIはPDFから以下のような定性情報を整理します。
 - 初心者向け解説
 - 投資メモ
 
-AIには株価、EPS、PER、PBR、時価総額を推測させません。
+AIには株価、EPS、FEPS、NxFEPS、PER、PBR、時価総額を推測させません。
 
 AIには売上、営業利益、純利益、EPSをPDFから抜き出して断定させません。正式データはAPI由来データだけです。
+
+## Ver4.0 直近PERと予想PER
+
+Ver4.0では、J-Quantsの期間一致したstatementから `EPS`、`FEPS`、`NxFEPS` を取得候補に追加しています。
+
+PER分析では以下を表示します。
+
+- 直近PER: yfinance現在株価 ÷ J-Quants EPS
+- 会社予想EPSベースの予想PER: yfinance現在株価 ÷ J-Quants FEPS
+- 次期予想PER候補: yfinance現在株価 ÷ J-Quants NxFEPS
+
+`FEPS` と `NxFEPS` はJ-Quantsのフィールド定義に従うため、レポートでは元フィールド名と補足を表示します。
+
+期間不一致の場合や、EPSが未取得、0、赤字の場合はPERを計算せず、理由を補足欄に表示します。
+
+PERが1000倍を超える場合は、異常値の可能性があるためWARNINGを表示します。
 
 ## Ver3.0 データ取得調査
 
@@ -228,9 +246,9 @@ python main.py data/pdfs/kioxia260515_1.pdf --stock-code 285A --period-type FY -
 
 期間が一致しない場合は、APIデータが取れていても「参考データ」として表示し、分析やPER計算には使いません。
 
-PER分析では、yfinanceの現在株価と、ユーザー指定期間に一致したJ-Quants正式EPSだけを使います。J-Quants正式EPSが未取得の場合、PERは計算しません。
+PER分析では、yfinanceの現在株価と、ユーザー指定期間に一致したJ-Quants EPS / FEPS / NxFEPS だけを使います。必要なEPSが未取得の場合、該当するPERは計算しません。
 
-表示名は「現在株価ベースの実績PER」とします。株価は現在時点、EPSは指定決算期の実績値であり、同じ日付同士の比較ではないためです。
+表示名は「直近PER」「会社予想EPSベースの予想PER」「次期予想PER候補」と分けます。株価は現在時点、EPSは指定決算期の値であり、同じ日付同士の比較ではないためです。
 
 無料プランや契約プランの取得可能期間外とJ-Quantsが返した場合は、Markdownの「期間整合性チェック」セクションに表示します。
 
@@ -295,7 +313,7 @@ PDF上には業績や財務に関する定量情報が掲載されています�
 ## 将来の拡張計画
 
 - 株価、PBR、時価総額などの市場データをJ-Quantsや他の正式データソースで検証できるようにする
-- API由来のEPS、BPS、自己資本、発行済株式数を使ってPER/PBRを安定計算する
+- API由来のBPS、自己資本、発行済株式数を使ってPBRなどを安定計算する
 - 市場規模データを取り込み、3年後、5年後、10年後の見通しを比較する
 - 同業他社データを取り込み、自社スコアの相対評価を出す
 - Discord通知で重要な分析結果を送る

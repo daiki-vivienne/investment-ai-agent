@@ -167,7 +167,7 @@ def build_safe_per_memo_section(period_check_result: JQuantsPeriodCheckResult | 
 ## PER分析メモ
 
 - PERは未取得です。
-- 理由: ユーザー指定期間と一致するJ-Quants正式EPSが未取得のため、PERは計算しません。
+- 理由: ユーザー指定期間と一致するJ-Quants正式データが未取得のため、直近PER・予想PER・次期予想PER候補は計算しません。
 """.strip()
 
     period_type = period_check_result.requested_period_type
@@ -179,9 +179,9 @@ def build_safe_per_memo_section(period_check_result: JQuantsPeriodCheckResult | 
     return f"""
 ## PER分析メモ
 
-- 現在株価ベースの実績PERは取得済みです。
-- 株価データ元はyfinance、EPSデータ元はJ-Quantsです。
-- 株価は現在時点、EPSは指定決算期の実績値です。{non_fy_note}
+- 直近PER、会社予想EPSベースの予想PER、次期予想PER候補の取得状態は、上部の「PER分析」セクションを確認してください。
+- 株価データ元はyfinance、EPS/FEPS/NxFEPSのデータ元はJ-Quantsです。
+- 株価は現在時点、EPS/FEPS/NxFEPSはJ-Quantsの期間一致statement内の値です。{non_fy_note}
 """.strip()
 
 
@@ -247,20 +247,9 @@ def guard_ai_analysis_markdown(
     if contains_unsafe_word(memo_section, UNSAFE_PDF_QUANT_WORDS):
         sections["## 投資メモ"] = build_safe_investment_memo_section()
 
-    per_memo_section = sections.get("## PER分析メモ", "")
-    should_replace_per_memo = (
-        per_memo_section.strip() == ""
-        or "数値スコア" in per_memo_section
-        or (
-            period_check_result is not None
-            and period_check_result.is_period_matched
-            and period_check_result.requested_period_type.upper() != "FY"
-            and "通期実績EPSや予想EPSではありません" not in per_memo_section
-        )
-    )
-
-    if should_replace_per_memo:
-        sections["## PER分析メモ"] = build_safe_per_memo_section(period_check_result)
+    # PERの具体的な数値は機械生成した表だけに表示し、
+    # AIによる再転記や数値の取り違えを防ぐため、メモは常に固定文へ置き換えます。
+    sections["## PER分析メモ"] = build_safe_per_memo_section(period_check_result)
 
     score_section = sections.get("## AIスコア", "")
     if contains_unsafe_word(score_section, UNSAFE_SCORE_WORDS):
