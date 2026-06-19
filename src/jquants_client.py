@@ -23,6 +23,8 @@ SALES_FIELD_CANDIDATES = ["Sales", "NetSales", "Revenue", "OperatingRevenue", "T
 OPERATING_PROFIT_FIELD_CANDIDATES = ["OP", "OperatingProfit", "OperatingIncome"]
 NET_INCOME_FIELD_CANDIDATES = ["NP", "Profit", "ProfitAttributableToOwnersOfParent", "NetIncome"]
 EPS_FIELD_CANDIDATES = ["EPS", "EarningsPerShare", "BasicEarningsPerShare"]
+FORECAST_EPS_FIELD_CANDIDATES = ["FEPS", "ForecastEarningsPerShare"]
+NEXT_FORECAST_EPS_FIELD_CANDIDATES = ["NxFEPS", "NextForecastEarningsPerShare"]
 
 
 @dataclass
@@ -51,6 +53,8 @@ class JQuantsStatementSummary:
     operating_profit: Any
     net_income: Any
     eps: Any
+    forecast_eps: Any
+    next_forecast_eps: Any
 
 
 @dataclass
@@ -144,6 +148,8 @@ def create_statement_summary(statement: dict[str, Any]) -> JQuantsStatementSumma
     operating_profit, _ = get_first_existing_field(statement, OPERATING_PROFIT_FIELD_CANDIDATES)
     net_income, _ = get_first_existing_field(statement, NET_INCOME_FIELD_CANDIDATES)
     eps, _ = get_first_existing_field(statement, EPS_FIELD_CANDIDATES)
+    forecast_eps, _ = get_first_existing_field(statement, FORECAST_EPS_FIELD_CANDIDATES)
+    next_forecast_eps, _ = get_first_existing_field(statement, NEXT_FORECAST_EPS_FIELD_CANDIDATES)
 
     return JQuantsStatementSummary(
         disclosed_date=str(statement.get("DiscDate") or statement.get("DisclosedDate") or NOT_ACQUIRED),
@@ -155,6 +161,8 @@ def create_statement_summary(statement: dict[str, Any]) -> JQuantsStatementSumma
         operating_profit=operating_profit,
         net_income=net_income,
         eps=eps,
+        forecast_eps=forecast_eps,
+        next_forecast_eps=next_forecast_eps,
     )
 
 
@@ -193,7 +201,9 @@ def create_formal_data_items(selected_statement: dict[str, Any] | None) -> dict[
         "sales": ("売上", SALES_FIELD_CANDIDATES),
         "operating_profit": ("営業利益", OPERATING_PROFIT_FIELD_CANDIDATES),
         "net_income": ("純利益", NET_INCOME_FIELD_CANDIDATES),
-        "eps": ("EPS", EPS_FIELD_CANDIDATES),
+        "eps": ("実績EPS", EPS_FIELD_CANDIDATES),
+        "forecast_eps": ("予想EPS", FORECAST_EPS_FIELD_CANDIDATES),
+        "next_forecast_eps": ("次期予想EPS候補", NEXT_FORECAST_EPS_FIELD_CANDIDATES),
     }
     formal_data_items = {}
 

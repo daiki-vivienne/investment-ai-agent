@@ -16,6 +16,8 @@ J-Quants APIはJPX系のデータサービスであり、日本株の株価や�
 - 営業利益
 - 純利益
 - EPS
+- FEPS
+- NxFEPS
 
 ## 認証
 
@@ -70,6 +72,8 @@ python src/jquants_research_sample.py 285A --period-type 3Q --fiscal-year-end 20
 | 営業利益 | `/v2/fins/summary` 候補 | `financials.Operating Income` | IFRS/Non-GAAPの違い |
 | 純利益 | `/v2/fins/summary` 候補 | `financials.Net Income` | 親会社帰属利益かどうか |
 | EPS | `/v2/fins/summary` 候補 | `trailingEps` | TTM/通期/Non-GAAPの違い |
+| FEPS | `/v2/fins/summary` 候補 | 未採用 | 会社予想EPS候補。J-Quantsのフィールド定義確認が必要 |
+| NxFEPS | `/v2/fins/summary` 候補 | 未採用 | 次期予想EPS候補。J-Quantsのフィールド定義確認が必要 |
 
 ## 2026-06-08 実行メモ
 
@@ -135,6 +139,8 @@ V2の短縮フィールド `OP` と `NP` を候補に追加したところ、売
 - operating_profit
 - net_income
 - eps
+- forecast_eps
+- next_forecast_eps
 
 さらに、`--period-type` と `--fiscal-year-end` を指定すると、条件に一致するstatementだけを選択して主要4項目を表示します。
 
@@ -196,6 +202,28 @@ python main.py data/pdfs/kioxia260515_1.pdf --stock-code 285A --period-type FY -
 
 PDF上の数値は「PDF上の主な記述」として分け、正式データではなく参考情報として扱います。
 
+## Ver4.0 直近PER・予想PER調査メモ
+
+Ver4.0では、J-Quantsの期間一致したstatementから `EPS`、`FEPS`、`NxFEPS` を取得候補に追加しました。
+
+PER分析では以下のように扱います。
+
+| 項目 | 計算式 | データ元 | 注意点 |
+| --- | --- | --- | --- |
+| 直近PER | yfinance現在株価 ÷ J-Quants EPS | yfinance / J-Quants | EPSは期間一致した正式データのみ使用 |
+| 会社予想EPSベースの予想PER | yfinance現在株価 ÷ J-Quants FEPS | yfinance / J-Quants | FEPSは会社予想EPS候補。定義確認が必要 |
+| 次期予想PER候補 | yfinance現在株価 ÷ J-Quants NxFEPS | yfinance / J-Quants | NxFEPSは次期予想EPS候補。定義確認が必要 |
+
+安全ルール:
+
+- PDF由来EPSは使わない
+- yfinance由来EPSは使わない
+- 期間不一致のJ-Quants EPS / FEPS / NxFEPS は使わない
+- EPSが未取得、0、赤字の場合は該当PERを計算しない
+- PERが1000倍を超える場合は異常値WARNINGを表示する
+
+`FEPS` / `NxFEPS` は取得できても、J-Quantsのフィールド定義と対象期間を確認できるよう、Markdown上に元フィールド名と補足を表示します。
+
 ## 実行結果記入欄
 
 実行後、以下の表に結果を貼り付けます。
@@ -206,6 +234,8 @@ PDF上の数値は「PDF上の主な記述」として分け、正式データ�
 | operating_profit | 未実行 | - | - | - | 未実行 | - | JQUANTS_API_KEY設定後に確認 |
 | net_income | 未実行 | - | - | - | 未実行 | - | JQUANTS_API_KEY設定後に確認 |
 | eps | 未実行 | - | - | - | 未実行 | - | JQUANTS_API_KEY設定後に確認 |
+| forecast_eps | 未実行 | - | - | FEPS | 未実行 | - | JQUANTS_API_KEY設定後に確認 |
+| next_forecast_eps | 未実行 | - | - | NxFEPS | 未実行 | - | JQUANTS_API_KEY設定後に確認 |
 
 ## 現時点の判断
 

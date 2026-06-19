@@ -120,19 +120,18 @@ PER分析は未実行です。
     return f"""
 ## PER分析
 
-| 項目 | 内容 |
-| --- | --- |
-| PER種別 | {format_markdown_value(per_analysis_result.per_type)} |
-| 現在株価 | {format_markdown_value(per_analysis_result.current_price)} |
-| EPS | {format_markdown_value(per_analysis_result.eps)} |
-| EPS対象期間 | {format_markdown_value(per_analysis_result.eps_period_type)} |
-| 現在株価ベースの実績PER | {format_markdown_value(per_analysis_result.per)} |
-| 状態 | {format_markdown_value(per_analysis_result.status)} |
-| 株価データ元 | {format_markdown_value(per_analysis_result.price_source)} |
-| EPSデータ元 | {format_markdown_value(per_analysis_result.eps_source)} |
-| 時点 | {format_markdown_value(per_analysis_result.as_of_date)} |
-| 注意 | 株価は現在時点、EPSは指定決算期の実績値です。 |
-| 補足 | {format_markdown_value(per_analysis_result.note)} |
+| 項目 | 値 | データ元 | 補足 |
+| ---- | ---- | ---- | ---- |
+| 現在株価 | {format_markdown_value(per_analysis_result.current_price)} | {format_markdown_value(per_analysis_result.current_price_source)} | {format_markdown_value(per_analysis_result.current_price_note)} |
+| 実績EPS | {format_markdown_value(per_analysis_result.eps)} | {format_markdown_value(per_analysis_result.eps_source)} | {format_markdown_value(per_analysis_result.eps_note)} |
+| 直近PER | {format_markdown_value(per_analysis_result.actual_per)} | {format_markdown_value(per_analysis_result.actual_per_source)} | {format_markdown_value(per_analysis_result.actual_per_note)} |
+| 予想EPS | {format_markdown_value(per_analysis_result.forecast_eps)} | {format_markdown_value(per_analysis_result.forecast_eps_source)} | {format_markdown_value(per_analysis_result.forecast_eps_note)} |
+| 会社予想EPSベースの予想PER | {format_markdown_value(per_analysis_result.forecast_per)} | {format_markdown_value(per_analysis_result.forecast_per_source)} | {format_markdown_value(per_analysis_result.forecast_per_note)} |
+| 次期予想EPS候補 | {format_markdown_value(per_analysis_result.next_forecast_eps)} | {format_markdown_value(per_analysis_result.next_forecast_eps_source)} | {format_markdown_value(per_analysis_result.next_forecast_eps_note)} |
+| 次期予想PER候補 | {format_markdown_value(per_analysis_result.next_forecast_per)} | {format_markdown_value(per_analysis_result.next_forecast_per_source)} | {format_markdown_value(per_analysis_result.next_forecast_per_note)} |
+| EPS対象期間 | {format_markdown_value(per_analysis_result.eps_period_type)} | J-Quants | TTM、会社予想、次期予想を混同しないでください。 |
+| 状態 | {format_markdown_value(per_analysis_result.status)} | - | {format_markdown_value(per_analysis_result.note)} |
+| 取得日時 | {format_markdown_value(per_analysis_result.as_of_date)} | - | {format_markdown_value(per_analysis_result.warning_message)} |
 """.strip()
 
 
@@ -193,8 +192,8 @@ CLIで `--period-type`、`--fiscal-year-end`、`--stock-code` を指定すると
             "",
             "以下はJ-Quantsから取得できたstatement一覧です。ユーザー指定期間と一致しないデータは参考情報であり、分析やPER計算には使いません。",
             "",
-            "| disclosed_date | document_type | current_period_type | current_period_end | current_fiscal_year_end | sales | operating_profit | net_income | eps |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+            "| disclosed_date | document_type | current_period_type | current_period_end | current_fiscal_year_end | sales | operating_profit | net_income | eps | forecast_eps | next_forecast_eps |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ]
     )
 
@@ -209,7 +208,9 @@ CLIで `--period-type`、`--fiscal-year-end`、`--stock-code` を指定すると
             f"{format_markdown_value(statement.sales)} | "
             f"{format_markdown_value(statement.operating_profit)} | "
             f"{format_markdown_value(statement.net_income)} | "
-            f"{format_markdown_value(statement.eps)} |"
+            f"{format_markdown_value(statement.eps)} | "
+            f"{format_markdown_value(statement.forecast_eps)} | "
+            f"{format_markdown_value(statement.next_forecast_eps)} |"
         )
 
     return "\n".join(lines)
