@@ -40,7 +40,21 @@ report_writer.py でMarkdown保存
 
 アプリの入り口です。
 
-PDF読み込み、PDF参考情報抽出、APIデータ取得、AI要約、投資判断支援セクション作成、Markdown保存を順番に実行します。
+CLI引数の受け取り、`.env` の設定読み込み、`report_service.py` の呼び出し、結果表示を担当します。
+
+Ver5.0以降、PDF読み込み、APIデータ取得、AI要約、Markdown保存などの中心処理は `src/report_service.py` に移動しました。
+
+### src/report_service.py
+
+CLIと将来のDiscord Botで共通利用するレポート生成サービスです。
+
+`generate_report()` が、PDF読み込み、PDF参考情報抽出、APIデータ取得、期間整合性チェック、PER分析、AI要約、Markdown保存を順番に実行します。
+
+戻り値は `ReportGenerationResult` です。
+
+この戻り値には、処理状態、メッセージ、保存したMarkdownファイルのパス、Markdown本文が入ります。
+
+Discord Bot化するときは、Bot側からこの `generate_report()` を呼び出す想定です。
 
 ### src/pdf_reader.py
 
@@ -105,15 +119,18 @@ python main.py data/pdfs/sample.pdf --ticker 285A
 このとき、処理は次の順番で進みます。
 
 1. `main.py` が起動する
-2. PDFパスと証券コードを受け取る
-3. `.env` からOpenAI APIキーを読み込む
-4. `pdf_reader.py` がPDFテキストを抽出する
-5. `numeric_extractor.py` がPDF由来の参考情報セクションを作る
-6. `market_data_client.py` がAPI由来データを取得する
-7. `ai_analyzer.py` がPDFテキストとAPI由来データを使って要約する
-8. `valuation_analyzer.py` がJ-Quants EPS / FEPS / NxFEPS とyfinance株価を使ってPER分析する
-9. `main.py` がPDF由来、API由来、AI要約、投資判断支援を結合する
-10. `report_writer.py` がMarkdownファイルを保存する
+2. `main.py` がPDFパス、証券コード、決算期などのCLI引数を受け取る
+3. `main.py` が `.env` からOpenAI APIキーなどを読み込む
+4. `main.py` が `report_service.generate_report()` を呼び出す
+5. `pdf_reader.py` がPDFテキストを抽出する
+6. `numeric_extractor.py` がPDF由来の参考情報セクションを作る
+7. `market_data_client.py` がAPI由来データを取得する
+8. `jquants_client.py` がJ-Quantsデータの期間整合性を確認する
+9. `valuation_analyzer.py` がJ-Quants EPS / FEPS / NxFEPS とyfinance株価を使ってPER分析する
+10. `ai_analyzer.py` がPDFテキストとAPI由来データを使って要約する
+11. `report_service.py` がPDF由来、API由来、AI要約、投資判断支援を結合する
+12. `report_writer.py` がMarkdownファイルを保存する
+13. `main.py` が保存先を表示する
 
 ## なぜPDF数値をPER計算に使わないのか
 
@@ -316,3 +333,29 @@ Ver4.0では、友達の要望である「直近PERと予想PER」を安全に�
 また、EPSが未取得、0、赤字の場合はPERを計算せず、Markdownの補足欄に理由を表示します。
 
 この設計により、PDF由来のEPS、yfinance由来のEPS、期間不一致のJ-Quantsデータを混ぜずに、投資判断材料として安全なPER表を作れます。
+
+## Ver5.0で追加した考え方
+
+Ver5.0では、将来のDiscord Bot化に備えて、レポート生成処理を `src/report_service.py` に切り出しました。
+
+これまでは `main.py` が、CLI引数の受け取りからPDF読み込み、API取得、AI要約、Markdown保存まで多くの役割を持っていました。
+
+しかしDiscord Botを作る場合、Botから `main.py` をそのまま実行するより、共通関数を呼び出せるほうが分かりやすく安全です。
+
+そのため、`generate_report()` という共通関数を作りました。
+
+```text
+main.py
+  ↓
+generate_report()
+
+Discord Bot（将来）
+  ↓
+generate_report()
+```
+
+`report_service.py` の中では `sys.exit()` を使いません。
+
+エラーは `main.py` 側で受け取り、初心者にも分かるメッセージとして表示します。
+
+この分離により、Ver6でDiscord Botを作るときも、既存の投資分析ロジックを壊さずに入口だけ追加できます。
