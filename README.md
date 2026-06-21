@@ -2,7 +2,7 @@
 
 決算PDFとAPI由来データを使い、投資判断材料を整理するMarkdownレポートを保存するCLIアプリです。
 
-Ver5.0では「PDFは定性情報」「J-Quantsは正式財務データ」「yfinanceは参考市場データ」と役割を分けたまま、レポート生成処理をCLIと将来のDiscord Botで共通利用できるサービスに分離しています。
+Ver6.0では「PDFは定性情報」「J-Quantsは正式財務データ」「yfinanceは参考市場データ」と役割を分けたまま、Discord BotからもMarkdownレポートを生成できる試作版を追加しています。
 
 自動売買はまだ実装していません。
 
@@ -61,14 +61,18 @@ Copy-Item .env.example .env
 
 `.env` を開き、`OPENAI_API_KEY` に自分のOpenAI APIキーを設定します。
 J-Quantsを使う場合は、`JQUANTS_API_KEY` も設定します。
+Discord Botを使う場合は、`DISCORD_BOT_TOKEN` も設定します。
 
 ```env
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
 OPENAI_MODEL=gpt-4o-mini
 JQUANTS_API_KEY=your_jquants_api_key_here
+DISCORD_BOT_TOKEN=your_discord_bot_token_here
+DISCORD_ALLOWED_CHANNEL_ID=123456789012345678
 ```
 
 APIキーは秘密情報です。GitHubなどに公開しないでください。
+`DISCORD_ALLOWED_CHANNEL_ID` は任意設定です。未設定の場合、Discord Botは従来通りすべてのチャンネルで `!analyze` に反応します。
 
 ## 実行方法
 
@@ -99,6 +103,42 @@ yfinanceで別tickerを指定したい場合だけ、`--ticker` を使います�
 ```powershell
 python main.py data/pdfs/sample_financial_report.pdf --output-dir data/reports
 ```
+
+## Discord Botの実行方法
+
+Ver6.0では、ローカルで動かす試作用Discord Botを追加しています。
+
+Discord Botを使う場合は、Discord Developer PortalでBotを作成し、`.env` に `DISCORD_BOT_TOKEN` を設定してください。
+
+特定のテキストチャンネルだけでBotを使いたい場合は、`.env` に `DISCORD_ALLOWED_CHANNEL_ID` を設定します。
+チャンネル名ではなく、DiscordのチャンネルIDを指定してください。
+未設定の場合は、チャンネル制限なしで動作します。
+
+通常メッセージコマンドを使うため、Bot設定で Message Content Intent が必要になる場合があります。
+
+```powershell
+python discord_bot.py
+```
+
+Discordでは、PDFを1つ添付して以下のように送信します。
+
+```text
+!analyze 285A FY 2025-03-31
+```
+
+BotはPDFを `data/discord_uploads/` に一時保存し、`src/report_service.py` の `generate_report()` を呼び出してMarkdownレポートを作成します。
+
+生成されたMarkdownレポートは、既存通り `data/reports/` に保存され、Discordにも添付して返信されます。
+
+一時保存したPDFは、処理後に削除します。
+
+注意点:
+
+- Discordの添付ファイルサイズ上限を超えるPDFは送信できません。
+- AI分析、J-Quants、yfinanceへの外部通信があるため、分析には時間がかかる場合があります。
+- 今回は1回のコマンドにつきPDF 1つだけ対応します。
+- `DISCORD_ALLOWED_CHANNEL_ID` を設定した場合、指定チャンネル以外の `!analyze` は無反応になります。
+- スラッシュコマンド、本番常駐、クラウドデプロイ、スケジュール通知はまだ実装していません。
 
 ## 出力されるレポート
 
@@ -228,6 +268,26 @@ Markdownレポート生成
 
 Discord用トークンやBot起動処理は追加せず、まずは共通処理の土台だけを作っています。
 
+## Ver6.0 Discord Bot試作
+
+Ver6.0では、DiscordにPDFを添付して `!analyze` コマンドを送ると、BotがMarkdownレポートを返せる試作版を追加しています。
+
+Discord Bot専用の分析処理は作らず、Ver5.0で作った `src/report_service.py` の `generate_report()` を使います。
+
+```text
+Discord PDF添付
+  ↓
+discord_bot.py
+  ↓
+src/report_service.py の generate_report()
+  ↓
+MarkdownレポートをDiscordに返信
+```
+
+Bot自身のメッセージには反応せず、`!analyze` で始まらない通常メッセージは無視します。
+
+`generate_report()` は時間がかかるため、Discord Bot側では `asyncio.to_thread()` を使ってイベントループを塞がないようにしています。
+
 ## Ver3.0 データ取得調査
 
 投資判断支援に必要なデータをどこから取得できるか、調査結果を以下にまとめています。
@@ -336,7 +396,7 @@ PDF上には業績や財務に関する定量情報が掲載されています�
 
 ## 将来の拡張計画
 
-- Discord Botを追加し、PDF添付から `generate_report()` を呼び出せるようにする
+- スラッシュコマンドやクラウド常駐など、Discord Botの運用機能を追加する
 - 株価、PBR、時価総額などの市場データをJ-Quantsや他の正式データソースで検証できるようにする
 - API由来のBPS、自己資本、発行済株式数を使ってPBRなどを安定計算する
 - 市場規模データを取り込み、3年後、5年後、10年後の見通しを比較する
