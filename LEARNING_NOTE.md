@@ -44,6 +44,18 @@ CLI引数の受け取り、`.env` の設定読み込み、`report_service.py` �
 
 Ver5.0以降、PDF読み込み、APIデータ取得、AI要約、Markdown保存などの中心処理は `src/report_service.py` に移動しました。
 
+### discord_bot.py
+
+Discord Botの入り口です。
+
+PDF添付付きの `!analyze 285A FY 2025-03-31` のようなメッセージを受け取り、`src/report_service.py` の `generate_report()` を呼び出します。
+
+Discord Bot専用の分析処理は作らず、CLIと同じレポート生成サービスを使います。
+
+一時保存したPDFは `data/discord_uploads/` に置き、処理後に削除します。
+
+`generate_report()` は時間がかかるため、Discord Bot側では `asyncio.to_thread()` を使ってイベントループを塞がないようにします。
+
 ### src/report_service.py
 
 CLIと将来のDiscord Botで共通利用するレポート生成サービスです。
@@ -359,3 +371,40 @@ generate_report()
 エラーは `main.py` 側で受け取り、初心者にも分かるメッセージとして表示します。
 
 この分離により、Ver6でDiscord Botを作るときも、既存の投資分析ロジックを壊さずに入口だけ追加できます。
+
+## Ver6.0で追加した考え方
+
+Ver6.0では、DiscordからPDFを送るだけでMarkdownレポートを返せる試作Botを追加しました。
+
+操作イメージは次の通りです。
+
+```text
+DiscordにPDFを添付
+  ↓
+!analyze 285A FY 2025-03-31
+  ↓
+BotがPDFを一時保存
+  ↓
+generate_report() を実行
+  ↓
+MarkdownレポートをDiscordに添付して返信
+```
+
+重要なのは、Discord Bot用に分析処理を作り直していないことです。
+
+分析処理はこれまでと同じ `generate_report()` を使います。
+
+これにより、CLIで安全に動いているPDF/API/AIの責務分離、期間整合性チェック、PER計算ルールをDiscordでもそのまま使えます。
+
+通常メッセージコマンドを使うため、Discord Developer Portalで Message Content Intent が必要になる場合があります。
+
+Botを特定のテキストチャンネルだけで使いたい場合は、`.env` に `DISCORD_ALLOWED_CHANNEL_ID` を設定します。
+チャンネル名ではなくIDで判定するのは、チャンネル名は後から変更される可能性がある一方で、IDは基本的に変わらないためです。
+未設定の場合は、従来通りチャンネル制限なしで動作します。
+指定チャンネル以外では、Botは `!analyze` に反応せず無視します。
+
+また、Discordの添付ファイルサイズ上限や、AI分析に時間がかかる点にも注意が必要です。
+
+今回のVer6.0はローカルで動かす試作版です。
+
+本番サーバー常駐、クラウドデプロイ、スケジュール通知、スラッシュコマンドはまだ実装しません。

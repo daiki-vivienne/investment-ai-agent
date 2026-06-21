@@ -9,6 +9,9 @@ data/pdfs/*
 data/reports/*
 !data/reports/.gitkeep
 
+data/discord_uploads/*
+!data/discord_uploads/.gitkeep
+
 # VSCode
 .vscode/
 
